@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QDoubleSpinBox,
     QSpinBox,
+    QComboBox,
     QTableWidget,
     QTableWidgetItem,
     QPushButton,
@@ -41,12 +42,30 @@ class TabSediment(QWidget):
         self.spin_tend.setSingleStep(3600.0)
         grid_p.addWidget(self.spin_tend, 0, 1)
 
-        grid_p.addWidget(QLabel("Time Step Factor (factime):"), 0, 2)
+        grid_p.addWidget(QLabel("Time Step Mode & Value:"), 0, 2)
+        h_dt = QHBoxLayout()
+        self.combo_dt_mode = QComboBox()
+        self.combo_dt_mode.addItems(["Adaptive (Table × factime)", "Fixed dt (seconds)"])
+        self.combo_dt_mode.currentIndexChanged.connect(self._on_dt_mode_changed)
+
         self.spin_factime = QDoubleSpinBox()
-        self.spin_factime.setRange(0.01, 10.0)
+        self.spin_factime.setRange(0.001, 10.0)
         self.spin_factime.setValue(0.25)
         self.spin_factime.setSingleStep(0.05)
-        grid_p.addWidget(self.spin_factime, 0, 3)
+        self.spin_factime.setToolTip("Multiplication factor for CROSMOR adaptive time step table")
+
+        self.spin_dt_fixed = QDoubleSpinBox()
+        self.spin_dt_fixed.setRange(1.0, 86400.0)
+        self.spin_dt_fixed.setValue(300.0)
+        self.spin_dt_fixed.setSingleStep(60.0)
+        self.spin_dt_fixed.setSuffix(" s")
+        self.spin_dt_fixed.setToolTip("Explicit constant time step dt in seconds")
+        self.spin_dt_fixed.setVisible(False)
+
+        h_dt.addWidget(self.combo_dt_mode)
+        h_dt.addWidget(self.spin_factime)
+        h_dt.addWidget(self.spin_dt_fixed)
+        grid_p.addLayout(h_dt, 0, 3)
 
         grid_p.addWidget(QLabel("Active Layer Thickness dl (m):"), 1, 0)
         self.spin_dl = QDoubleSpinBox()
@@ -158,10 +177,25 @@ class TabSediment(QWidget):
 
         layout.addWidget(grp_vol)
 
+    def _on_dt_mode_changed(self, idx: int) -> None:
+        is_fixed = (idx == 1)
+        self.spin_factime.setVisible(not is_fixed)
+        self.spin_dt_fixed.setVisible(is_fixed)
+
     def load_config(self, config: SimulationConfig) -> None:
         m = config.morpho
         self.spin_tend.setValue(m.tend)
-        self.spin_factime.setValue(m.factime)
+        if m.dt_fixed is not None and m.dt_fixed > 0:
+            self.combo_dt_mode.setCurrentIndex(1)
+            self.spin_dt_fixed.setValue(float(m.dt_fixed))
+            self.spin_factime.setVisible(False)
+            self.spin_dt_fixed.setVisible(True)
+        else:
+            self.combo_dt_mode.setCurrentIndex(0)
+            self.spin_factime.setValue(m.factime)
+            self.spin_factime.setVisible(True)
+            self.spin_dt_fixed.setVisible(False)
+
         self.spin_dl.setValue(m.dl)
         self.spin_por.setValue(m.por)
         self.spin_rhos.setValue(m.rhos)
@@ -200,6 +234,10 @@ class TabSediment(QWidget):
         m = config.morpho
         m.tend = self.spin_tend.value()
         m.factime = self.spin_factime.value()
+        if self.combo_dt_mode.currentIndex() == 1:
+            m.dt_fixed = self.spin_dt_fixed.value()
+        else:
+            m.dt_fixed = None
         m.dl = self.spin_dl.value()
         m.por = self.spin_por.value()
         m.rhos = self.spin_rhos.value()

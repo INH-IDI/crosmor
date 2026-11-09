@@ -50,6 +50,26 @@ def test_simulation_runner_execution():
     assert all(c >= 0.0 for c in last_step.transport.c_mean_vol)
 
 
+def test_fixed_dt_runner():
+    inp_file = _find_file("Dgoot1.inp")
+    if not inp_file.exists():
+        pytest.skip("Dgoot1.inp not found")
+
+    cfg = read_inp(inp_file)
+    cfg.morpho.tend = 300.0
+    cfg.morpho.dt_fixed = 100.0  # Exactly 100 s per step
+
+    runner = SimulationRunner(cfg)
+    assert runner.compute_adaptive_dt(0.5) == 100.0
+    assert runner.compute_adaptive_dt(5.0) == 100.0
+
+    res = runner.run()
+    assert len(res.time_steps) == 3
+    assert np.isclose(res.time_steps[0].dt, 100.0)
+    assert np.isclose(res.time_steps[1].dt, 100.0)
+    assert np.isclose(res.time_steps[2].dt, 100.0)
+
+
 def test_gui_offscreen_components():
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
     from PyQt6.QtWidgets import QApplication
@@ -80,5 +100,11 @@ def test_gui_offscreen_components():
         assert not win.dashboard.c_ca.isVisible()
         win.dashboard.chk_concentration.setChecked(True)
         assert win.dashboard.c_ca.isVisible()
+
+        # Check TabSediment fixed dt UI
+        win.tab_sediment.combo_dt_mode.setCurrentIndex(1)
+        win.tab_sediment.spin_dt_fixed.setValue(123.0)
+        cfg_fixed = win.collect_config()
+        assert cfg_fixed.morpho.dt_fixed == 123.0
 
     win.close()

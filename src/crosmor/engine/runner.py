@@ -35,7 +35,10 @@ class SimulationRunner:
         return self._is_cancelled
 
     def compute_adaptive_dt(self, h_offshore: float) -> float:
-        """Compute time step dt (seconds) matching CROSMOR.F (lines 351-358)."""
+        """Compute time step dt (seconds) matching CROSMOR.F (lines 351-358) or fixed dt."""
+        if self.config.morpho.dt_fixed is not None and self.config.morpho.dt_fixed > 0.0:
+            return float(self.config.morpho.dt_fixed)
+
         factime = self.config.morpho.factime
         if 0.0 <= h_offshore <= 1.0:
             return factime * 3600.0

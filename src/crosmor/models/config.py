@@ -85,6 +85,7 @@ class MorphoParams(BaseModel):
     facsusw: float = Field(1.0, description="Calibration factor wave-related suspended load (default 1.0)")
     tend: float = Field(86400.0, description="Total computation time (s)")
     factime: float = Field(0.25, description="Time step factor multiplier")
+    dt_fixed: Optional[float] = Field(None, description="Optional fixed time step dt in seconds (overrides adaptive table if > 0)")
     facbed_smooth: float = Field(0.2, description="Bed smoothing factor (gamb = facbed_smooth * 0.005)")
     facgrain_smooth: float = Field(1.0, description="Fractions smoothing factor (gamp = facgrain_smooth * 0.2)")
     water_temp: float = Field(15.0, description="Water temperature (Celsius)")
