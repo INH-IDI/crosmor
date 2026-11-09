@@ -1,0 +1,14 @@
+*    NHT
+      2
+*   In case option 2, specify hereafter wave height Hrms , T and TETA as functio
+*   interpolated linearly at each time step (if end time is smaller than total
+*   computation time, the cycle is repeated)
+*    TIME(s) HRMS    T   TETA W10
+*                               TIME = duration (s)
+*                               Hrms = RMS wave height (m)
+*                               T    = wave period (s)
+*                               TETA = anle of wave incidence to normal (pos. or
+*                               W10
+    0.         2.0    7.   15.  0.
+    72000.     2.0    7.   15.  0.
+

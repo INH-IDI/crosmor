@@ -1,0 +1,71 @@
+"""End-to-end tests for SimulationRunner, QThread worker, and GUI."""
+
+import os
+import sys
+from pathlib import Path
+import numpy as np
+import pytest
+
+from crosmor.io.inp_reader import read_inp
+from crosmor.engine.runner import SimulationRunner
+from crosmor.models.config import SimulationConfig
+
+
+def _find_file(fname: str) -> Path:
+    cand1 = Path(__file__).parent.parent / "examples" / fname
+    if cand1.exists():
+        return cand1
+    return Path(__file__).parent.parent.parent / fname
+
+
+def test_simulation_runner_execution():
+    inp_file = _find_file("Dgoot1.inp")
+    if not inp_file.exists():
+        pytest.skip("Dgoot1.inp not found")
+
+    cfg = read_inp(inp_file)
+    cfg.morpho.tend = 100.0
+    cfg.morpho.factime = 0.01  # dt = 36s -> 3 steps for 100s
+
+    runner = SimulationRunner(cfg)
+    steps_received = []
+
+    def on_step(res, prog):
+        steps_received.append((res, prog))
+
+    results = runner.run(on_step_callback=on_step)
+    assert len(results.time_steps) >= 2
+    assert len(steps_received) == len(results.time_steps)
+
+    # Check conservation of cross-shore grid
+    first_step = results.time_steps[0]
+    last_step = results.time_steps[-1]
+    assert len(first_step.x) == len(last_step.x)
+    assert np.all(np.array(last_step.morpho.z_current) < 5.0)  # Physical bed levels
+
+
+def test_gui_offscreen_components():
+    os.environ["QT_QPA_PLATFORM"] = "offscreen"
+    from PyQt6.QtWidgets import QApplication
+    from crosmor.gui.main_window import MainWindow
+
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+
+    win = MainWindow()
+    inp_file = _find_file("Dgoot1.inp")
+
+    if inp_file.exists():
+        win.load_inp_file(inp_file)
+        assert win.current_config.title == "Dgoot1"
+
+        # Check tabs state
+        assert win.tab_grid.table.rowCount() > 0
+        assert win.tab_sediment.spin_tend.value() > 0
+
+        # Collect back config
+        cfg = win.collect_config()
+        assert cfg.title == "Dgoot1"
+
+    win.close()

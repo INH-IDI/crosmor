@@ -1,0 +1,195 @@
+* Example for 1 sand fraction (uniform sand); wavedata from file; ROUGHNESS COMPUTED AUTOMATICALLY
+* INPUTFILE; READ DIAGNOSE FILE IF FILE DOES NOT RUN
+* Text lines have * at first position; data have no *
+*                               1
+*             \                 1       /
+*              \                1      /
+*               \               1     /
+*                > + wave angle 1    < - wave angle
+*                               1
+*    -------->+ Current         1   - current <------------
+* _____________________________________________________________
+*                            COAST
+*
+* Definition of directions is based on observer at beach with face to the sea (=shore normal)
+* Incidence wave angles are defined with respect to shore normal
+* Waves coming from left of shore normal have a positive angle to shore normal
+* Longshore current coming from left of shore normal has a positive value
+* Waves coming from right of shore normal have a negative angle to shore normal
+* Longshore current coming from right of shore normal has a negative value
+* X-axis starts offshore;x=0 at offshore boundary; positive in landward direction
+*
+* Options output hydrodynamics 0/1/2
+* 0= no output 1=output hydrodynamics weighted over all wave classes,
+* 2=output hydrodynamics per wave class
+  2
+* table length of tidal schematization (number of values as function of time);
+    2
+* specify Vlong and Ws as function of time; values are interpolated linearly at
+* each time step (if end time is smaller than computation time, the cycle is rep
+* VNUL1= longshore velocity at x=0 (positive and negative, see above sketch)
+* VNUL2= cross-shore velocity at x=0 as function of time (pos. in landward dir.)
+*
+* Ws=tidal water level to MSL (pos. upward, neg. downward)
+*   T (sec)    Vnul1(m/s)  Vnul2(m/s)  Ws(m)
+    0.           0.5        .05           0.
+   72000.        0.5        .05           0.
+*  table length of bottom schematization
+    3
+*   X=cross=shore coordinate, HMSL=depth to MSL (neg below MSL), NSTAP=nmber of
+*   X(m)  HMSL(m) NSTAP
+     0.    -10.     100
+     500   -3.     50
+     700.   -2.
+* minimum water depth for calculation hgrens
+*1/0 beach  no beach
+  0.25   0
+* table length storm (wind-induced) set-up HSTORM
+    2
+* HSTORM is constant along profile and specified as a function of time;
+* interpolation at each time step and cyclic repetition if end time is smaller
+* than total computation time
+*   T(s)    HSTORM(m)
+     0.        0.
+     72000.    0.
+* option=1/2/-2
+*              1= specify wave classes for 1 condition;
+*              2= compute wave classes (Rayleigh) based on Hrms for NHT conditio
+*             -2= same as 2 but NHT, Time, Hrms, T, Teta, w10 from file
+ -2
+*  In case of option 1, specify Number of wave classes, H= wave height at x=0,
+*  T=wave period, P=percentage of occurrence, TETA= wave angle to coast normal
+* Number of wave classes (option1, put * in front of lines if not required)
+* 9
+*    H     T    P    TETA   W10
+*                               H = wave height(m)
+*                               T = wave period(s)
+*                               P = perc entage of occurrence
+*                               TETA = angle wave incidence w.r.t. coast normal
+*                                      (positive or negative)
+*                               W10= wind velocity (m/s) at 10 m above surface
+*   0.3    2      0.14      0.  0.
+*   0.55   3      0.13      0.  0.
+*   0.70   3.7    0.13      0.  0.
+*   0.85   4      0.13      0.  0.
+*   1.0    4      0.14      0.  0.
+*   1.15   4      0.15      0.  0.
+*   1.3    4      0.08      0.  0.
+*   1.5    5      0.06      0.  0.
+*   1.9    5      0.04      0.  0.
+*  In case of option 2 or -2 (put * in front of lines if not required),
+*   specify NHW= number of wave classes
+*   if NHW=1 then the HRMS is multiplied with 1.41 to compute transport rates
+*    NHW
+      5
+*  In case option -2, specify name of wave data file (maximum 12 characters; no space 
+* in first column)
+awavedat.inp
+*  In case option 2, specify hereafter NHT=number of conditions
+*    NHT
+*     2
+*   In case option 2, specify hereafter wave height Hrms , T and TETA as functio
+*   interpolated linearly at each time step (if end time is smaller than total
+*   computation time, the cycle is repeated)
+*    TIME(s) HRMS    T   TETA W10
+*                               TIME = duration (s)
+*                               Hrms = RMS wave height (m)
+*                               T    = wave period (s)
+*                               TETA = anle of wave incidence to normal (pos. or
+*                               W10
+*   0.         0.01    5.   0.  0.
+*   72000.     0.01    5.   0.  0.
+*  Parameters for hydrodynamics (friction, breaking, currents)
+*
+*  Switch1 0/1; 0=velocity asymmetry Isobe-Horikawa; 1= Ruessink 2008
+*  ROller-coefficient (0=maximum roller effect; 1.= no roller; default=0.5)
+*  COEF6=distance for averaging of wave parameters in undertow model; 3 field cases; 1 lab cases 
+*  CLH= coefficient for Longuet-Higgins streaming near the bed (0-1)
+*  CSW= coefficient to include effective swash velocity near water line for shingle beach (0-1)
+*  Switch2 0/1; 0=excl. acceleration effect on shear stress,  1=incl. acceleration effect of Nielsen
+*  Switch3 0/1; 0=excl. phase lag effects for wave-related susp. transport, 1= incl phase lags
+*  SL=Maximum slope angle of dune front (in degrees); sliding occurs if local bed angle is larger
+*  SEF=suspension enhancement factor=1 to 2; 1 without dune erosion; 2 for dune erosion
+*  Switch4 0/1 (integer); o=excluding long waves in surf zone; 1= incl.
+*
+*  Switch1 ROLLERcoef  COEF6  CLH  CSW  Switch2  Switch3  SL   SEF  Swithch4 
+      1        0.5       1.     1.  1.     0       0      50    1.   1
+*
+*  COEFSR=coefficient roller shear stress at water surface (0=default, gives zero stress)
+*  GAMMA=breaking index (0=default,computed by model; otherwise specify value 0.
+*  ELS=horizontal mixing coefficient for longshore current (0.1 to 3 m2/s);
+*  COEF5= parameter related to averaging of wave height and  depth for long. current;
+*         3 for field cases; 1 for lab cases
+*  ELS=horizontal mixing coefficient for longshore current (0.1 to 10 m2/s);
+*  Niteration=number of iterations for longshore velocities (=1 if TETA=0)
+*  SW=0.01 to 0.2= extra smoothing near waterline (over 10 points on both sides of last point)
+*  COEFSR  GAMMA  coef5   ELS(m2/s)    Niteration   SW
+   0.       0      1.      0.5            300       0.2       
+*  options output transport 0/1/2 and NOUT
+*  0= no output transport; 1=summed over classes; 2= transport per class
+*  NOUT= output of bed levels after any NOUT time steps
+    2  3
+*   Sediment transport parameters
+*   DL   = thickness of active transport layer (m) ( 0.2 to 1)
+*   RHOS = sediment density (2650 kg/m3)
+*   POR  = porosity of bed ( 0.4 )
+*   facbed= calibration factor bed load transport (default=1)
+*   facsusc= calibration factor current-related susp.load transport (default=1)
+*   facsusw= calibration factor wave-related susp.load transport (default=1)
+*   T-END= total computation time (s)
+*   DL(m)  RHOS(kg/m3) POR(-) facbed (-) facsusc (-) facsusw (-) T-END (s)
+      0.25    2650      .4     1.0        1.0          1.0    86400.
+*   
+*   factime;  DT=factime*3600 seconds if 0<Hrms,off<1 m
+*             DT=factime*2400         if 1<Hrms,off<2 m 
+*              DT=factime*1200         if 2<Hrms,off<3 m 
+*              DT=factime*600          if 3<Hrms,off<3.5 m 
+*              DT=factime*300          if 3.5<Hrms,off<4 m 
+*              DT=factime*200          if 4<Hrms,off<4.5 m 
+*              DT=factime*100          if Hrms,off<4.5 m 
+*   facbed;   Smoothing-bed=facbed*0.005; facbed may be as large as 500
+*   facgrain; Smoothing-fractions=facgrain*0.2
+*   factime   facbed      facgrain
+    0.25          0.2            1
+*   NFR  = NUMBER OF SAND FRACTIONS
+*   NSED = NUMBER OF X-COORDINATES FOR SEDIMENT DATA
+*   TE   = WATER TEMPERATURE [ CELSIUS ]
+*   SA   = SALINITY OF FLUID [ PROMILLE ]
+*   NFR        NSED     TE      SA
+    1           7       15      0
+*   X    = X-COORDINATE [ M ]
+*   RC   = CURRENT-RELATED ROUGHNESS [ M ]; if RC=0.; RC is computed by model
+*   RW   = WAVE-RELATED ROUGHNESS [ M ];    if RW=0.; RW is computed by model
+*   PMUD = PERCENTAGE OF MUD IN BED [ % ]  =
+*   FRIP= multiplication factor to undertow (FRIP=1 standard model)
+*    X(m)    RC(m)    RW(m)   PMUD(%) FRIP
+     0.      0.       0.     0.     1.
+     135.    0.       0.     0.     1.
+     142.    0.       0.     0.     1.
+     155.    0.       0.     0.     1.
+     160.    0.       0.     0.     1.
+     165     0.       0.     0.     1.
+     700.    0.       0.     0.     1.
+*   Dsi   GRAIN DIAMETER OF FRACTION I (MAX 10) [ M ]
+*   Ds1    Ds2    Ds3    Ds4     Ds5     Ds6    Ds7  Ds8   Ds9    Ds10
+    .0002
+* X   Psi  = PART OF TOTAL FOR FRACTION I ( SOM(Psi+PMUD/100 +/- 1 ) [ - ]
+* X   Ps1    Ps2    Ps3    Ps4     Ps5     Ps6    Ps7  Ps8   Ps9    Ps10
+    0.      1.
+    135.    1.
+    142.    1.
+    155.    1.
+    160.    1.
+    165.    1.
+    700.    1.
+*   Ndc = Number of depth contours for partial sediment integration
+*   ( 10 maximum )
+    5
+*   depth contours ( ndc values )
+    -6. -4.  -2.  -1.  2.
+*   Ndx = Number of x-coordinates for partial sediment integration
+*   ( 10 maximum )
+    5
+*   x-coordinates  ( ndx values )
+    0.  500.  700. 3000.  4000.
+
