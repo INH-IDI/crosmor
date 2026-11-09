@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QKeySequence, QIcon
 
-from crosmor.models.config import SimulationConfig, BathymetrySection, WaveClass
+from crosmor.models.config import SimulationConfig, BathymetrySection, WaveClass, SedimentProfilePoint
 from crosmor.models.results import SimulationResults, TimeStepResult, MorphoProfileSummary
 from crosmor.hydrodynamics.wave_solver import build_grid
 from crosmor.io.inp_reader import read_inp
@@ -68,15 +68,19 @@ class MainWindow(QMainWindow):
         cfg = SimulationConfig()
         cfg.title = "Default CROSMOR Case"
         cfg.bathymetry = [
-            BathymetrySection(x=0.0, hmsl=10.0, nstap=10),
-            BathymetrySection(x=1500.0, hmsl=2.0, nstap=10),
-            BathymetrySection(x=1800.0, hmsl=0.0, nstap=10),
-            BathymetrySection(x=2000.0, hmsl=-3.0, nstap=None),
+            BathymetrySection(x=0.0, hmsl=-10.0, nstap=50),
+            BathymetrySection(x=1500.0, hmsl=-2.0, nstap=30),
+            BathymetrySection(x=1800.0, hmsl=0.0, nstap=20),
+            BathymetrySection(x=2000.0, hmsl=3.0, nstap=None),
         ]
         cfg.morpho.grain_diameters = [0.0002]
         cfg.morpho.tend = 3600.0  # 1 hour in seconds
         cfg.morpho.factime = 1.0
         cfg.wave_classes = [WaveClass(h=2.0, t=7.0, p=1.0, teta=15.0)]
+        cfg.sediment_points = [
+            SedimentProfilePoint(x=0.0, rc=0.0, rw=0.0, pmud=0.0, frip=1.0, fractions=[1.0]),
+            SedimentProfilePoint(x=2000.0, rc=0.0, rw=0.0, pmud=0.0, frip=1.0, fractions=[1.0]),
+        ]
         return cfg
 
     def _init_ui(self) -> None:

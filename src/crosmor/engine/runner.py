@@ -4,7 +4,7 @@ import time as pytime
 from typing import Callable, Optional, List
 import numpy as np
 
-from crosmor.models.config import SimulationConfig, WaveClass
+from crosmor.models.config import SimulationConfig, WaveClass, SedimentProfilePoint
 from crosmor.models.results import TimeStepResult, SimulationResults
 from crosmor.numerics.interpolation import rintpl
 from crosmor.hydrodynamics.wave_solver import build_grid, solve_wave_hydrodynamics
@@ -70,6 +70,7 @@ class SimulationRunner:
         # 1. Build spatial grid
         x_grid, hmsl_grid, nxi = build_grid(config)
         nx = len(x_grid)
+        nxi = max(3, min(nx, nxi))
 
         # Bed level: in Fortran zbo is initial depth (zbo = -hmsl)
         zbo = -hmsl_grid
@@ -80,9 +81,54 @@ class SimulationRunner:
         psi_grid = np.zeros((nfr, nx), dtype=np.float64)
         dsi = np.array(config.morpho.grain_diameters, dtype=np.float64)
 
+        # Ensure default sediment points exist spanning the grid if none defined
+        if not config.sediment_points:
+            config.sediment_points = [
+                SedimentProfilePoint(
+                    x=float(x_grid[0]),
+                    rc=0.0,
+                    rw=0.0,
+                    pmud=0.0,
+                    frip=1.0,
+                    fractions=[1.0 / nfr] * nfr,
+                ),
+                SedimentProfilePoint(
+                    x=float(x_grid[-1]),
+                    rc=0.0,
+                    rw=0.0,
+                    pmud=0.0,
+                    frip=1.0,
+                    fractions=[1.0 / nfr] * nfr,
+                ),
+            ]
+        elif len(config.sediment_points) == 1:
+            pt = config.sediment_points[0]
+            fracs = list(pt.fractions) if pt.fractions else [1.0 / nfr] * nfr
+            config.sediment_points = [
+                SedimentProfilePoint(
+                    x=float(x_grid[0]),
+                    rc=pt.rc,
+                    rw=pt.rw,
+                    pmud=pt.pmud,
+                    frip=pt.frip,
+                    fractions=fracs,
+                ),
+                SedimentProfilePoint(
+                    x=float(x_grid[-1]),
+                    rc=pt.rc,
+                    rw=pt.rw,
+                    pmud=pt.pmud,
+                    frip=pt.frip,
+                    fractions=fracs,
+                ),
+            ]
+
         xs_arr = np.array([p.x for p in config.sediment_points], dtype=np.float64)
         for j in range(nfr):
-            frac_j_arr = np.array([p.fractions[j] for p in config.sediment_points], dtype=np.float64)
+            frac_j_arr = np.array(
+                [p.fractions[j] if len(p.fractions) > j else (1.0 / nfr) for p in config.sediment_points],
+                dtype=np.float64,
+            )
             psi_grid[j, :] = np.interp(x_grid, xs_arr, frac_j_arr)
 
         d50_grid = np.zeros(nx, dtype=np.float64)
@@ -111,8 +157,8 @@ class SimulationRunner:
         qcrxr_accum = 0.0
         last = False
 
-        arksc_grid = np.zeros(nxi, dtype=np.float64)
-        arksw_grid = np.zeros(nxi, dtype=np.float64)
+        arksc_grid = np.zeros(nx, dtype=np.float64)
+        arksw_grid = np.zeros(nx, dtype=np.float64)
 
         while time < tend and not self._is_cancelled:
             # Handle GUI pause
@@ -150,7 +196,7 @@ class SimulationRunner:
                 if current_depth <= config.hgrens:
                     nxi = i
                     break
-            nxi = max(3, nxi)
+            nxi = max(3, min(nx, nxi))
 
             # Hydrodynamics
             wave_profs, hydro_summary, water_depth, arksc_out, arksw_out = solve_wave_hydrodynamics(

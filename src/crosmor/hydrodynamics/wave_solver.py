@@ -29,6 +29,18 @@ def build_grid(config: SimulationConfig) -> Tuple[np.ndarray, np.ndarray, int]:
     h_nodes = []
 
     sections = config.bathymetry
+    if not sections or len(sections) < 2:
+        sections = [
+            BathymetrySection(x=0.0, hmsl=-10.0, nstap=50),
+            BathymetrySection(x=1500.0, hmsl=-2.0, nstap=30),
+            BathymetrySection(x=1800.0, hmsl=0.0, nstap=20),
+            BathymetrySection(x=2000.0, hmsl=3.0, nstap=None),
+        ]
+
+    # In standard CROSMOR .inp, bed elevation is negative below MSL (-10m is 10m water depth).
+    # If a user entered positive water depth convention (e.g. 10m at x=0), handle it gracefully.
+    use_depth_direct = (sections[0].hmsl > 0)
+
     for j in range(len(sections) - 1):
         x0 = sections[j].x
         x1 = sections[j + 1].x
@@ -40,10 +52,12 @@ def build_grid(config: SimulationConfig) -> Tuple[np.ndarray, np.ndarray, int]:
             x = x0 + k * dx
             x_nodes.append(x)
             # Linearly interpolate depth to MSL
-            # In Fortran: hmsl is positive depth (hmsl = -hmsl)
-            # In our BathymetrySection, hmsl is stored as in .inp (negative below MSL)
-            h0 = -sections[j].hmsl
-            h1 = -sections[j + 1].hmsl
+            if use_depth_direct:
+                h0 = sections[j].hmsl
+                h1 = sections[j + 1].hmsl
+            else:
+                h0 = -sections[j].hmsl
+                h1 = -sections[j + 1].hmsl
             frac = k / nstap
             h = h0 + frac * (h1 - h0)
             h_nodes.append(h)
@@ -57,6 +71,7 @@ def build_grid(config: SimulationConfig) -> Tuple[np.ndarray, np.ndarray, int]:
         if h_arr[i] <= config.hgrens:
             nxi = i
             break
+    nxi = max(3, min(len(x_arr), nxi))
 
     return x_arr, h_arr, nxi
 
@@ -123,18 +138,29 @@ def solve_wave_hydrodynamics(
             tanbx[i] = (zbn[i + 1] - zbn[i - 1]) / (x_grid[i + 1] - x_grid[i - 1])
 
     # Sediment properties along grid
-    xs_arr = np.array([p.x for p in config.sediment_points], dtype=np.float64)
-    rc_arr = np.array([p.rc for p in config.sediment_points], dtype=np.float64)
-    rw_arr = np.array([p.rw for p in config.sediment_points], dtype=np.float64)
-    frip_arr = np.array([p.frip for p in config.sediment_points], dtype=np.float64)
-
     rksc_grid = np.zeros(nxi, dtype=np.float64)
     rksw_grid = np.zeros(nxi, dtype=np.float64)
     frip_grid = np.zeros(nxi, dtype=np.float64)
-    for i in range(nxi):
-        rksc_grid[i] = max(1e-5, rintpl(x_grid[i], rc_arr, xs_arr))
-        rksw_grid[i] = max(1e-5, rintpl(x_grid[i], rw_arr, xs_arr))
-        frip_grid[i] = rintpl(x_grid[i], frip_arr, xs_arr)
+
+    if not config.sediment_points:
+        rksc_grid.fill(1e-4)
+        rksw_grid.fill(1e-4)
+        frip_grid.fill(1.0)
+    elif len(config.sediment_points) == 1:
+        p = config.sediment_points[0]
+        rksc_grid.fill(max(1e-5, p.rc if p.rc > 0 else 1e-4))
+        rksw_grid.fill(max(1e-5, p.rw if p.rw > 0 else 1e-4))
+        frip_grid.fill(p.frip if p.frip > 0 else 1.0)
+    else:
+        xs_arr = np.array([p.x for p in config.sediment_points], dtype=np.float64)
+        rc_arr = np.array([p.rc for p in config.sediment_points], dtype=np.float64)
+        rw_arr = np.array([p.rw for p in config.sediment_points], dtype=np.float64)
+        frip_arr = np.array([p.frip for p in config.sediment_points], dtype=np.float64)
+
+        for i in range(nxi):
+            rksc_grid[i] = max(1e-5, rintpl(x_grid[i], rc_arr, xs_arr))
+            rksw_grid[i] = max(1e-5, rintpl(x_grid[i], rw_arr, xs_arr))
+            frip_grid[i] = max(0.1, rintpl(x_grid[i], frip_arr, xs_arr))
 
     d50_grid = np.full(nxi, config.morpho.grain_diameters[0] if config.morpho.grain_diameters else 0.0002)
 

@@ -176,6 +176,13 @@ class TabSediment(QWidget):
 
         self.edit_diams.setText(" ".join(str(d) for d in m.grain_diameters))
 
+        if not config.sediment_points:
+            nfr = len(m.grain_diameters) if m.grain_diameters else 1
+            config.sediment_points = [
+                SedimentProfilePoint(x=0.0, rc=0.0, rw=0.0, pmud=0.0, frip=1.0, fractions=[1.0 / nfr] * nfr),
+                SedimentProfilePoint(x=2000.0, rc=0.0, rw=0.0, pmud=0.0, frip=1.0, fractions=[1.0 / nfr] * nfr),
+            ]
+
         self.table_sed.blockSignals(True)
         self.table_sed.setRowCount(len(config.sediment_points))
         for r, sp in enumerate(config.sediment_points):
@@ -239,7 +246,8 @@ class TabSediment(QWidget):
     def _add_sed_row(self) -> None:
         r = self.table_sed.rowCount()
         self.table_sed.insertRow(r)
-        self.table_sed.setItem(r, 0, QTableWidgetItem("0.0"))
+        default_x = 0.0 if r == 0 else float(r * 500.0)
+        self.table_sed.setItem(r, 0, QTableWidgetItem(f"{default_x:.1f}"))
         self.table_sed.setItem(r, 1, QTableWidgetItem("0.0"))
         self.table_sed.setItem(r, 2, QTableWidgetItem("0.0"))
         self.table_sed.setItem(r, 3, QTableWidgetItem("0.0"))

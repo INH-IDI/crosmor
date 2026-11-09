@@ -78,9 +78,14 @@ def solve_morphodynamics(
     dmt = np.zeros((nfr, nxi), dtype=np.float64)
 
     # Sediment metadata along grid
-    xs_arr = np.array([p.x for p in config.sediment_points], dtype=np.float64)
-    pmud_arr = np.array([p.pmud for p in config.sediment_points], dtype=np.float64)
-    pmud_grid = np.interp(x_grid[:nxi], xs_arr, pmud_arr)
+    if not config.sediment_points:
+        pmud_grid = np.zeros(nxi, dtype=np.float64)
+    elif len(config.sediment_points) == 1:
+        pmud_grid = np.full(nxi, config.sediment_points[0].pmud, dtype=np.float64)
+    else:
+        xs_arr = np.array([p.x for p in config.sediment_points], dtype=np.float64)
+        pmud_arr = np.array([p.pmud for p in config.sediment_points], dtype=np.float64)
+        pmud_grid = np.interp(x_grid[:nxi], xs_arr, pmud_arr)
 
     dsi = np.array(config.morpho.grain_diameters, dtype=np.float64)
 
