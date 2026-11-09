@@ -74,7 +74,8 @@ class PlayerBar(QWidget):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFixedWidth(180)
+        self.progress_bar.setMinimumWidth(80)
+        self.progress_bar.setMaximumWidth(160)
         h_btn_layout.addWidget(self.progress_bar)
 
         main_layout.addLayout(h_btn_layout)

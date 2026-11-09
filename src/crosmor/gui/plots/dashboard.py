@@ -46,14 +46,19 @@ class MorphoDashboard(QWidget):
         main_layout.setSpacing(4)
 
         # ---------------------------------------------------------------------
-        # Top Control Toolbar: Panel Selection and Layer Toggles
+        # Top Control Toolbar: Panel Selection and Layer Toggles (2 compact rows)
         # ---------------------------------------------------------------------
-        toolbar = QHBoxLayout()
-        toolbar.setSpacing(8)
+        tb_layout = QVBoxLayout()
+        tb_layout.setSpacing(4)
+        tb_layout.setContentsMargins(0, 0, 0, 2)
+
+        # Row 1: View Presets & Panel Toggles
+        row1 = QHBoxLayout()
+        row1.setSpacing(8)
 
         lbl_panels = QLabel("Panels:")
         lbl_panels.setStyleSheet("font-weight: bold; color: #1e293b;")
-        toolbar.addWidget(lbl_panels)
+        row1.addWidget(lbl_panels)
 
         self.combo_presets = QComboBox()
         self.combo_presets.addItems([
@@ -68,65 +73,71 @@ class MorphoDashboard(QWidget):
             "Custom Selection",
         ])
         self.combo_presets.currentIndexChanged.connect(self._on_preset_changed)
-        toolbar.addWidget(self.combo_presets)
+        row1.addWidget(self.combo_presets)
 
         # Individual panel toggle checkboxes
         self.chk_p1 = QCheckBox("Profile")
         self.chk_p1.setChecked(True)
         self.chk_p1.toggled.connect(self._on_panel_checkbox_toggled)
-        toolbar.addWidget(self.chk_p1)
+        row1.addWidget(self.chk_p1)
 
         self.chk_p2 = QCheckBox("Hydro")
         self.chk_p2.setChecked(True)
         self.chk_p2.toggled.connect(self._on_panel_checkbox_toggled)
-        toolbar.addWidget(self.chk_p2)
+        row1.addWidget(self.chk_p2)
 
         self.chk_p3 = QCheckBox("Transport")
         self.chk_p3.setChecked(True)
         self.chk_p3.toggled.connect(self._on_panel_checkbox_toggled)
-        toolbar.addWidget(self.chk_p3)
+        row1.addWidget(self.chk_p3)
 
         self.chk_p_conc = QCheckBox("Concentration")
         self.chk_p_conc.setChecked(False)
         self.chk_p_conc.toggled.connect(self._on_panel_checkbox_toggled)
-        toolbar.addWidget(self.chk_p_conc)
+        row1.addWidget(self.chk_p_conc)
         # Compatibility alias
         self.chk_concentration = self.chk_p_conc
 
         self.chk_p4 = QCheckBox("Bed Δz")
         self.chk_p4.setChecked(False)
         self.chk_p4.toggled.connect(self._on_panel_checkbox_toggled)
-        toolbar.addWidget(self.chk_p4)
+        row1.addWidget(self.chk_p4)
 
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setFrameShadow(QFrame.Shadow.Sunken)
-        toolbar.addWidget(sep)
+        row1.addStretch()
+        tb_layout.addLayout(row1)
 
-        # Internal layer toggles
-        self.chk_init_bed = QCheckBox("Init Bed")
+        # Row 2: Curve Overlays and Auto-Range Action
+        row2 = QHBoxLayout()
+        row2.setSpacing(8)
+
+        lbl_display = QLabel("Display:")
+        lbl_display.setStyleSheet("font-weight: bold; color: #1e293b;")
+        row2.addWidget(lbl_display)
+
+        self.chk_init_bed = QCheckBox("Initial Bed")
         self.chk_init_bed.setChecked(True)
         self.chk_init_bed.toggled.connect(self._toggle_curves)
-        toolbar.addWidget(self.chk_init_bed)
+        row2.addWidget(self.chk_init_bed)
 
-        self.chk_water_level = QCheckBox("Water Level")
+        self.chk_water_level = QCheckBox("Water Level (NAP)")
         self.chk_water_level.setChecked(True)
         self.chk_water_level.toggled.connect(self._toggle_curves)
-        toolbar.addWidget(self.chk_water_level)
+        row2.addWidget(self.chk_water_level)
 
-        self.chk_transport_components = QCheckBox("Transport Parts")
+        self.chk_transport_components = QCheckBox("Transport Components (Sb, Ss, Slong)")
         self.chk_transport_components.setChecked(True)
         self.chk_transport_components.toggled.connect(self._toggle_curves)
-        toolbar.addWidget(self.chk_transport_components)
+        row2.addWidget(self.chk_transport_components)
 
-        toolbar.addStretch()
+        row2.addStretch()
 
         self.btn_autorange = QPushButton("⟲ Auto Range")
         self.btn_autorange.setToolTip("Reset visible plot views to fit full data")
         self.btn_autorange.clicked.connect(self.auto_range)
-        toolbar.addWidget(self.btn_autorange)
+        row2.addWidget(self.btn_autorange)
 
-        main_layout.addLayout(toolbar)
+        tb_layout.addLayout(row2)
+        main_layout.addLayout(tb_layout)
 
         # Graphics Layout Widget
         self.glw = pg.GraphicsLayoutWidget()

@@ -12,6 +12,8 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QTabWidget,
     QSplitter,
+    QScrollArea,
+    QFrame,
     QFileDialog,
     QMessageBox,
     QStatusBar,
@@ -46,7 +48,19 @@ class MainWindow(QMainWindow):
     def __init__(self, initial_config_path: Optional[str] = None):
         super().__init__()
         self.setWindowTitle("CROSMOR 2026 - Coastal Morphodynamic Modeling System")
-        self.resize(1380, 860)
+
+        # Dynamically size and center window to fit within available screen space
+        screen = QApplication.primaryScreen()
+        if screen:
+            avail = screen.availableGeometry()
+            target_w = min(1380, max(880, int(avail.width() * 0.90)))
+            target_h = min(860, max(600, int(avail.height() * 0.88)))
+            self.resize(target_w, target_h)
+            x = avail.x() + max(0, (avail.width() - target_w) // 2)
+            y = avail.y() + max(0, (avail.height() - target_h) // 2)
+            self.move(x, y)
+        else:
+            self.resize(1200, 750)
 
         self.current_config: SimulationConfig = self._create_default_config()
         self.current_results: Optional[SimulationResults] = None
@@ -85,19 +99,29 @@ class MainWindow(QMainWindow):
 
     def _init_ui(self) -> None:
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(False)
         self.setCentralWidget(splitter)
 
-        # Left Pane: Tabbed Parameter Editors
+        # Left Pane: Tabbed Parameter Editors (wrapped in QScrollArea for smaller displays)
         self.tabs = QTabWidget()
         self.tab_grid = TabGrid()
         self.tab_forcing = TabForcing()
         self.tab_hydro = TabHydro()
         self.tab_sediment = TabSediment()
 
-        self.tabs.addTab(self.tab_grid, "1. Grid & Bathymetry")
-        self.tabs.addTab(self.tab_forcing, "2. Waves & Tide")
-        self.tabs.addTab(self.tab_hydro, "3. Hydrodynamics")
-        self.tabs.addTab(self.tab_sediment, "4. Sediment & Morpho")
+        def _make_scrollable(widget: QWidget) -> QScrollArea:
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            scroll.setWidget(widget)
+            return scroll
+
+        self.tabs.addTab(_make_scrollable(self.tab_grid), "1. Grid & Bathymetry")
+        self.tabs.addTab(_make_scrollable(self.tab_forcing), "2. Waves & Tide")
+        self.tabs.addTab(_make_scrollable(self.tab_hydro), "3. Hydrodynamics")
+        self.tabs.addTab(_make_scrollable(self.tab_sediment), "4. Sediment & Morpho")
         splitter.addWidget(self.tabs)
 
         # Right Pane: Real-time Dashboard and Player Bar
@@ -117,7 +141,11 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.player_bar)
 
         splitter.addWidget(right_container)
-        splitter.setSizes([460, 920])
+
+        curr_w = self.width() if self.width() > 0 else 1200
+        left_w = max(340, int(curr_w * 0.35))
+        right_w = max(550, curr_w - left_w)
+        splitter.setSizes([left_w, right_w])
 
     def _create_menus(self) -> None:
         mb = self.menuBar()
