@@ -1,6 +1,6 @@
 """Multi-panel synchronized real-time visualization dashboard using PyQtGraph."""
 
-from typing import Optional
+from typing import Optional, List
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtWidgets import (
@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QCheckBox,
+    QComboBox,
     QLabel,
     QFrame,
 )
@@ -23,16 +24,20 @@ pg.setConfigOption("antialias", True)
 
 
 class MorphoDashboard(QWidget):
-    """Real-time synchronized 4-panel dashboard displaying:
+    """Real-time synchronized multi-panel dashboard displaying:
     1. Cross-shore bed elevation Z_b(x) and water surface eta(x)
     2. Wave height H_rms(x) and currents (Longshore V_mix & Undertow U_cr)
     3. Sediment transport rates (Cross-shore & Longshore)
-    4. Cumulative bed level change dz(x) and grain size D50
+    4. Volumetric sediment concentration Ca(x) and C_mean(x)
+    5. Cumulative bed level change dz(x) and morphological evolution
+    
+    Supports dynamic panel selection (e.g. 3 of 5) to prevent vertical distortion.
     """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._first_render = True
+        self._block_preset_signal = False
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -40,15 +45,66 @@ class MorphoDashboard(QWidget):
         main_layout.setContentsMargins(6, 6, 6, 6)
         main_layout.setSpacing(4)
 
-        # Top Control Toolbar
+        # ---------------------------------------------------------------------
+        # Top Control Toolbar: Panel Selection and Layer Toggles
+        # ---------------------------------------------------------------------
         toolbar = QHBoxLayout()
-        toolbar.setSpacing(10)
+        toolbar.setSpacing(8)
 
-        lbl_display = QLabel("Display Layers:")
-        lbl_display.setStyleSheet("font-weight: bold; color: #334155;")
-        toolbar.addWidget(lbl_display)
+        lbl_panels = QLabel("Panels:")
+        lbl_panels.setStyleSheet("font-weight: bold; color: #1e293b;")
+        toolbar.addWidget(lbl_panels)
 
-        self.chk_init_bed = QCheckBox("Initial Bed (t=0)")
+        self.combo_presets = QComboBox()
+        self.combo_presets.addItems([
+            "3 Panels: Profile + Hydro + Transport",
+            "3 Panels: Profile + Transport + Concentration",
+            "3 Panels: Profile + Transport + Bed Δz",
+            "3 Panels: Profile + Hydro + Bed Δz",
+            "3 Panels: Hydro + Transport + Concentration",
+            "4 Panels: Profile + Hydro + Transport + Bed Δz",
+            "4 Panels: Profile + Transport + Conc + Bed Δz",
+            "All 5 Panels",
+            "Custom Selection",
+        ])
+        self.combo_presets.currentIndexChanged.connect(self._on_preset_changed)
+        toolbar.addWidget(self.combo_presets)
+
+        # Individual panel toggle checkboxes
+        self.chk_p1 = QCheckBox("Profile")
+        self.chk_p1.setChecked(True)
+        self.chk_p1.toggled.connect(self._on_panel_checkbox_toggled)
+        toolbar.addWidget(self.chk_p1)
+
+        self.chk_p2 = QCheckBox("Hydro")
+        self.chk_p2.setChecked(True)
+        self.chk_p2.toggled.connect(self._on_panel_checkbox_toggled)
+        toolbar.addWidget(self.chk_p2)
+
+        self.chk_p3 = QCheckBox("Transport")
+        self.chk_p3.setChecked(True)
+        self.chk_p3.toggled.connect(self._on_panel_checkbox_toggled)
+        toolbar.addWidget(self.chk_p3)
+
+        self.chk_p_conc = QCheckBox("Concentration")
+        self.chk_p_conc.setChecked(False)
+        self.chk_p_conc.toggled.connect(self._on_panel_checkbox_toggled)
+        toolbar.addWidget(self.chk_p_conc)
+        # Compatibility alias
+        self.chk_concentration = self.chk_p_conc
+
+        self.chk_p4 = QCheckBox("Bed Δz")
+        self.chk_p4.setChecked(False)
+        self.chk_p4.toggled.connect(self._on_panel_checkbox_toggled)
+        toolbar.addWidget(self.chk_p4)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        toolbar.addWidget(sep)
+
+        # Internal layer toggles
+        self.chk_init_bed = QCheckBox("Init Bed")
         self.chk_init_bed.setChecked(True)
         self.chk_init_bed.toggled.connect(self._toggle_curves)
         toolbar.addWidget(self.chk_init_bed)
@@ -58,34 +114,29 @@ class MorphoDashboard(QWidget):
         self.chk_water_level.toggled.connect(self._toggle_curves)
         toolbar.addWidget(self.chk_water_level)
 
-        self.chk_transport_components = QCheckBox("Transport Components")
+        self.chk_transport_components = QCheckBox("Transport Parts")
         self.chk_transport_components.setChecked(True)
         self.chk_transport_components.toggled.connect(self._toggle_curves)
         toolbar.addWidget(self.chk_transport_components)
 
-        self.chk_concentration = QCheckBox("Concentration (m³/m³)")
-        self.chk_concentration.setChecked(True)
-        self.chk_concentration.toggled.connect(self._toggle_curves)
-        toolbar.addWidget(self.chk_concentration)
-
         toolbar.addStretch()
 
         self.btn_autorange = QPushButton("⟲ Auto Range")
-        self.btn_autorange.setToolTip("Reset all plot views to fit full profile data")
+        self.btn_autorange.setToolTip("Reset visible plot views to fit full data")
         self.btn_autorange.clicked.connect(self.auto_range)
         toolbar.addWidget(self.btn_autorange)
 
         main_layout.addLayout(toolbar)
 
-        # Graphics Layout Widget with 4 rows
+        # Graphics Layout Widget
         self.glw = pg.GraphicsLayoutWidget()
         main_layout.addWidget(self.glw)
 
         # ---------------------------------------------------------------------
         # Plot 1: Bed Level & Water Surface
         # ---------------------------------------------------------------------
-        self.p1 = self.glw.addPlot(row=0, col=0)
-        self.p1.setTitle("<b>Cross-shore Profile & Water Surface</b>", color="#0f172a", size="11pt")
+        self.p1 = pg.PlotItem()
+        self.p1.setTitle("<b>Cross-shore Profile & Water Surface</b>", color="#0f172a", size="10pt")
         self.p1.setLabel("left", "Elevation (m NAP)")
         self.p1.showGrid(x=True, y=True, alpha=0.3)
         self.leg1 = self.p1.addLegend(offset=(10, 10))
@@ -101,11 +152,10 @@ class MorphoDashboard(QWidget):
         # ---------------------------------------------------------------------
         # Plot 2: Wave Heights & Currents
         # ---------------------------------------------------------------------
-        self.p2 = self.glw.addPlot(row=1, col=0)
-        self.p2.setTitle("<b>Hydrodynamics: Wave Height & Mean Currents</b>", color="#0f172a", size="11pt")
+        self.p2 = pg.PlotItem()
+        self.p2.setTitle("<b>Hydrodynamics: Wave Height & Mean Currents</b>", color="#0f172a", size="10pt")
         self.p2.setLabel("left", "Wave H (m) / Vel (m/s)")
         self.p2.showGrid(x=True, y=True, alpha=0.3)
-        self.p2.setXLink(self.p1)
         self.leg2 = self.p2.addLegend(offset=(10, 10))
 
         pen_hrms = pg.mkPen(color="#0369a1", width=2.0)
@@ -118,18 +168,16 @@ class MorphoDashboard(QWidget):
         self.c_vmix = self.p2.plot([], [], pen=pen_vmix, name="Longshore V_mix (m/s)")
         self.c_ucr = self.p2.plot([], [], pen=pen_ucr, name="Undertow U_cr (m/s)")
 
-        # Zero reference line for currents
         zero_line_p2 = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen(color="#cbd5e1", width=1, style=Qt.PenStyle.DashLine))
         self.p2.addItem(zero_line_p2)
 
         # ---------------------------------------------------------------------
-        # Plot 3: Sediment Transport Rates & Concentration
+        # Plot 3: Sediment Transport Rates (Pure transport in kg/(s*m))
         # ---------------------------------------------------------------------
-        self.p3 = self.glw.addPlot(row=2, col=0)
-        self.p3.setTitle("<b>Sediment Transport Rates & Concentration</b>", color="#0f172a", size="11pt")
+        self.p3 = pg.PlotItem()
+        self.p3.setTitle("<b>Sediment Transport Rates</b>", color="#0f172a", size="10pt")
         self.p3.setLabel("left", "Transport (kg/(s·m))")
         self.p3.showGrid(x=True, y=True, alpha=0.3)
-        self.p3.setXLink(self.p1)
         self.leg3 = self.p3.addLegend(offset=(10, 10))
 
         pen_st_cross = pg.mkPen(color="#b91c1c", width=2.0)
@@ -137,43 +185,39 @@ class MorphoDashboard(QWidget):
         pen_ss_cross = pg.mkPen(color="#7e22ce", width=1.2, style=Qt.PenStyle.DashLine)
         pen_st_long = pg.mkPen(color="#047857", width=2.0)
 
-        self.c_st_cross = self.p3.plot([], [], pen=pen_st_cross, name="Cross-shore Total S_t")
-        self.c_sb_cross = self.p3.plot([], [], pen=pen_sb_cross, name="Cross-shore Bedload S_b")
-        self.c_ss_cross = self.p3.plot([], [], pen=pen_ss_cross, name="Cross-shore Suspended S_s")
+        self.c_st_cross = self.p3.plot([], [], pen=pen_st_cross, name="Cross Total S_t")
+        self.c_sb_cross = self.p3.plot([], [], pen=pen_sb_cross, name="Cross Bedload S_b")
+        self.c_ss_cross = self.p3.plot([], [], pen=pen_ss_cross, name="Cross Suspended S_s")
         self.c_st_long = self.p3.plot([], [], pen=pen_st_long, name="Longshore Total S_t,long")
 
         zero_line_p3 = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen(color="#cbd5e1", width=1, style=Qt.PenStyle.DashLine))
         self.p3.addItem(zero_line_p3)
 
-        # Secondary right axis for volumetric sediment concentration (m³ sed / m³ agua)
-        self.vb_conc = pg.ViewBox()
-        self.p3.showAxis("right")
-        self.p3.scene().addItem(self.vb_conc)
-        self.p3.getAxis("right").linkToView(self.vb_conc)
-        self.vb_conc.setXLink(self.p3)
-        self.p3.getAxis("right").setLabel("Concentration (m³ sed / m³ agua)", color="#7c3aed")
+        # ---------------------------------------------------------------------
+        # Plot 4: Sediment Concentration (Dedicated plot in m3/m3)
+        # ---------------------------------------------------------------------
+        self.p_conc = pg.PlotItem()
+        self.p_conc.setTitle("<b>Sediment Concentration (Volumetric)</b>", color="#0f172a", size="10pt")
+        self.p_conc.setLabel("left", "Concentration (m³ sed / m³ agua)")
+        self.p_conc.showGrid(x=True, y=True, alpha=0.3)
+        self.leg_conc = self.p_conc.addLegend(offset=(10, 10))
 
-        self.p3.vb.sigResized.connect(self._sync_conc_view)
+        pen_ca = pg.mkPen(color="#7c3aed", width=2.2)
+        pen_cmean = pg.mkPen(color="#c026d3", width=1.8, style=Qt.PenStyle.DashLine)
 
-        pen_conc = pg.mkPen(color="#7c3aed", width=2.2)
-        pen_cmean = pg.mkPen(color="#a855f7", width=1.5, style=Qt.PenStyle.DashLine)
+        self.c_ca = self.p_conc.plot([], [], pen=pen_ca, name="Bed Conc Ca (m³/m³)")
+        self.c_cmean = self.p_conc.plot([], [], pen=pen_cmean, name="Mean Conc C_mean (m³/m³)")
 
-        self.c_ca = pg.PlotCurveItem([], [], pen=pen_conc, name="Bed Conc Ca (m³/m³)")
-        self.c_cmean = pg.PlotCurveItem([], [], pen=pen_cmean, name="Mean Conc C_mean (m³/m³)")
-        self.vb_conc.addItem(self.c_ca)
-        self.vb_conc.addItem(self.c_cmean)
-        self.leg3.addItem(self.c_ca, "Bed Conc Ca (m³/m³)")
-        self.leg3.addItem(self.c_cmean, "Mean Conc C_mean (m³/m³)")
+        zero_line_conc = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen(color="#cbd5e1", width=1, style=Qt.PenStyle.DashLine))
+        self.p_conc.addItem(zero_line_conc)
 
         # ---------------------------------------------------------------------
-        # Plot 4: Cumulative Bed Level Change dz
+        # Plot 5: Cumulative Bed Level Change dz
         # ---------------------------------------------------------------------
-        self.p4 = self.glw.addPlot(row=3, col=0)
-        self.p4.setTitle("<b>Morphodynamics: Cumulative Bed Level Change Δz</b>", color="#0f172a", size="11pt")
+        self.p4 = pg.PlotItem()
+        self.p4.setTitle("<b>Morphodynamics: Cumulative Bed Level Change Δz</b>", color="#0f172a", size="10pt")
         self.p4.setLabel("left", "Δz (m)")
-        self.p4.setLabel("bottom", "Cross-shore Distance x (m)")
         self.p4.showGrid(x=True, y=True, alpha=0.3)
-        self.p4.setXLink(self.p1)
         self.leg4 = self.p4.addLegend(offset=(10, 10))
 
         pen_dz = pg.mkPen(color="#0284c7", width=2.0)
@@ -182,29 +226,116 @@ class MorphoDashboard(QWidget):
         zero_line_p4 = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen(color="#cbd5e1", width=1, style=Qt.PenStyle.DashLine))
         self.p4.addItem(zero_line_p4)
 
-    def _sync_conc_view(self) -> None:
-        """Keep right secondary ViewBox perfectly synchronized with Plot 3 geometry."""
-        self.vb_conc.setGeometry(self.p3.vb.sceneBoundingRect())
-        self.vb_conc.linkedViewChanged(self.p3.vb, self.vb_conc.XAxis)
+        # Initial layout build
+        self._rebuild_plot_layout()
+
+    # -------------------------------------------------------------------------
+    # Dynamic Layout Management
+    # -------------------------------------------------------------------------
+    def _on_preset_changed(self, idx: int) -> None:
+        """Apply a standard panel preset."""
+        if self._block_preset_signal:
+            return
+
+        presets_map = {
+            0: [True, True, True, False, False],   # Profile + Hydro + Transport (3)
+            1: [True, False, True, True, False],   # Profile + Transport + Conc (3)
+            2: [True, False, True, False, True],   # Profile + Transport + Bed dz (3)
+            3: [True, True, False, False, True],   # Profile + Hydro + Bed dz (3)
+            4: [False, True, True, True, False],   # Hydro + Transport + Conc (3)
+            5: [True, True, True, False, True],    # Profile + Hydro + Trans + Bed dz (4)
+            6: [True, False, True, True, True],    # Profile + Trans + Conc + Bed dz (4)
+            7: [True, True, True, True, True],     # All 5
+        }
+
+        if idx in presets_map:
+            states = presets_map[idx]
+            self.chk_p1.blockSignals(True)
+            self.chk_p2.blockSignals(True)
+            self.chk_p3.blockSignals(True)
+            self.chk_p_conc.blockSignals(True)
+            self.chk_p4.blockSignals(True)
+
+            self.chk_p1.setChecked(states[0])
+            self.chk_p2.setChecked(states[1])
+            self.chk_p3.setChecked(states[2])
+            self.chk_p_conc.setChecked(states[3])
+            self.chk_p4.setChecked(states[4])
+
+            self.chk_p1.blockSignals(False)
+            self.chk_p2.blockSignals(False)
+            self.chk_p3.blockSignals(False)
+            self.chk_p_conc.blockSignals(False)
+            self.chk_p4.blockSignals(False)
+
+            self._rebuild_plot_layout()
+
+    def _on_panel_checkbox_toggled(self) -> None:
+        """Handle individual panel checkbox toggle and update preset combo."""
+        self._block_preset_signal = True
+        self.combo_presets.setCurrentIndex(8)  # 'Custom Selection'
+        self._block_preset_signal = False
+        self._rebuild_plot_layout()
+
+    def _rebuild_plot_layout(self) -> None:
+        """Dynamically add only selected plots to GraphicsLayoutWidget to maintain ideal vertical scale."""
+        self.glw.clear()
+
+        panels_to_show = []
+        if self.chk_p1.isChecked():
+            panels_to_show.append(self.p1)
+        if self.chk_p2.isChecked():
+            panels_to_show.append(self.p2)
+        if self.chk_p3.isChecked():
+            panels_to_show.append(self.p3)
+        if self.chk_p_conc.isChecked():
+            panels_to_show.append(self.p_conc)
+        if self.chk_p4.isChecked():
+            panels_to_show.append(self.p4)
+
+        if not panels_to_show:
+            self.chk_p1.setChecked(True)
+            panels_to_show.append(self.p1)
+
+        first_p = panels_to_show[0]
+        n_plots = len(panels_to_show)
+
+        for row_idx, p in enumerate(panels_to_show):
+            self.glw.addItem(p, row=row_idx, col=0)
+            if row_idx > 0:
+                p.setXLink(first_p)
+
+            is_bottom = (row_idx == n_plots - 1)
+            p.showAxis("bottom", is_bottom)
+            if is_bottom:
+                p.setLabel("bottom", "Cross-shore Distance x (m)")
+            else:
+                p.setLabel("bottom", "")
+
+        self.glw.ci.layout.setSpacing(6)
 
     def _toggle_curves(self) -> None:
-        """Handle layer visibility toggles."""
+        """Handle internal curve layer visibility toggles."""
         self.c_z_init.setVisible(self.chk_init_bed.isChecked())
         self.c_water.setVisible(self.chk_water_level.isChecked())
         show_trans_parts = self.chk_transport_components.isChecked()
         self.c_sb_cross.setVisible(show_trans_parts)
         self.c_ss_cross.setVisible(show_trans_parts)
-        show_conc = self.chk_concentration.isChecked()
-        self.c_ca.setVisible(show_conc)
-        self.c_cmean.setVisible(show_conc)
-        self.p3.showAxis("right", show_conc)
 
+    # -------------------------------------------------------------------------
+    # Data Streaming & Plotting
+    # -------------------------------------------------------------------------
     def update_data(self, step_res: TimeStepResult) -> None:
-        """Update all 4 panels with data from the given simulation time step."""
+        """Update all curves with data from the simulation time step."""
         if not step_res.x:
             return
 
         x = np.asarray(step_res.x, dtype=np.float64)
+
+        def _safe_set(curve, arr):
+            if arr is not None and len(arr) > 0:
+                n = min(len(x), len(arr))
+                curve.setData(x[:n], arr[:n])
 
         # Plot 1: Profile & Water level
         z_init = np.asarray(step_res.morpho.z_initial, dtype=np.float64)
@@ -218,11 +349,6 @@ class MorphoDashboard(QWidget):
         if len(eta) == len(x):
             self.c_water.setData(x, eta)
 
-        def _safe_set(curve, arr):
-            if arr is not None and len(arr) > 0:
-                n = min(len(x), len(arr))
-                curve.setData(x[:n], arr[:n])
-
         # Plot 2: Hydrodynamics
         hrms = np.asarray(step_res.hydro.hrms, dtype=np.float64)
         h13 = np.asarray(step_res.hydro.h13, dtype=np.float64)
@@ -234,7 +360,7 @@ class MorphoDashboard(QWidget):
         _safe_set(self.c_vmix, vmix)
         _safe_set(self.c_ucr, ucr)
 
-        # Plot 3: Transport
+        # Plot 3: Transport Rates
         st_c = np.asarray(step_res.transport.st_cross, dtype=np.float64)
         sb_c = np.asarray(step_res.transport.sb_cross, dtype=np.float64)
         ss_c = np.asarray(step_res.transport.ss_cross, dtype=np.float64)
@@ -245,18 +371,14 @@ class MorphoDashboard(QWidget):
         _safe_set(self.c_ss_cross, ss_c)
         _safe_set(self.c_st_long, st_l)
 
-        # Plot 3 secondary axis: Volumetric concentration (m³ sed / m³ agua)
+        # Plot 4: Concentration (m3/m3)
         c_ca = np.asarray(step_res.transport.c_vol or step_res.transport.ca_ref, dtype=np.float64)
         c_mean = np.asarray(step_res.transport.c_mean_vol, dtype=np.float64)
 
         _safe_set(self.c_ca, c_ca)
         _safe_set(self.c_cmean, c_mean)
 
-        self._sync_conc_view()
-        if (len(c_ca) > 0 and len(c_ca) <= len(x)) or (len(c_mean) > 0 and len(c_mean) <= len(x)):
-            self.vb_conc.enableAutoRange(axis=pg.ViewBox.YAxis)
-
-        # Plot 4: Bed Change
+        # Plot 5: Bed Change
         dz = np.asarray(step_res.morpho.dz_total, dtype=np.float64)
         _safe_set(self.c_dz, dz)
 
@@ -265,13 +387,9 @@ class MorphoDashboard(QWidget):
             self._first_render = False
 
     def auto_range(self) -> None:
-        """Autorange all subplots and secondary views."""
-        self.p1.autoRange()
-        self.p2.autoRange()
-        self.p3.autoRange()
-        self.vb_conc.autoRange()
-        self.p4.autoRange()
-        self._sync_conc_view()
+        """Autorange all instantiated plots."""
+        for p in [self.p1, self.p2, self.p3, self.p_conc, self.p4]:
+            p.autoRange()
 
     def clear(self) -> None:
         """Clear all curve data."""

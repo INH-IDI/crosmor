@@ -94,12 +94,14 @@ def test_gui_offscreen_components():
         cfg = win.collect_config()
         assert cfg.title == "Dgoot1"
 
-        # Check dashboard concentration controls
-        assert win.dashboard.chk_concentration.isChecked()
-        win.dashboard.chk_concentration.setChecked(False)
-        assert not win.dashboard.c_ca.isVisible()
+        # Check dashboard dynamic panel selection
         win.dashboard.chk_concentration.setChecked(True)
-        assert win.dashboard.c_ca.isVisible()
+        assert win.dashboard.chk_p_conc.isChecked()
+        win.dashboard.combo_presets.setCurrentIndex(1)  # 3 Panels: Profile + Transport + Concentration
+        assert win.dashboard.chk_p_conc.isChecked()
+        assert win.dashboard.chk_p1.isChecked()
+        assert win.dashboard.chk_p3.isChecked()
+        assert not win.dashboard.chk_p2.isChecked()
 
         # Check TabSediment fixed dt UI
         win.tab_sediment.combo_dt_mode.setCurrentIndex(1)
