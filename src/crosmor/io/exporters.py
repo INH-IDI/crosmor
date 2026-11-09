@@ -65,6 +65,8 @@ def export_results_to_excel(results: SimulationResults, file_path: Union[str, Pa
                     "v_longshore_mix_ms": _safe_col(last.hydro.v_mix, nx_last),
                     "st_cross_kg_s_m": _safe_col(last.transport.st_cross, nx_last),
                     "st_long_kg_s_m": _safe_col(last.transport.st_long, nx_last),
+                    "c_vol_m3_m3": _safe_col(last.transport.c_vol or last.transport.ca_ref, nx_last),
+                    "c_mean_vol_m3_m3": _safe_col(last.transport.c_mean_vol, nx_last),
                     "d50_m": _safe_col(last.morpho.d50, nx_last),
                 }
             )
@@ -117,6 +119,8 @@ def export_profile_to_csv(step: TimeStepResult, file_path: Union[str, Path]) -> 
             "st_long_kg_s_m": _col(step.transport.st_long),
             "sb_long_kg_s_m": _col(step.transport.sb_long),
             "ss_long_kg_s_m": _col(step.transport.ss_long),
+            "c_vol_m3_m3": _col(step.transport.c_vol or step.transport.ca_ref),
+            "c_mean_vol_m3_m3": _col(step.transport.c_mean_vol),
             "d50_m": _col(step.morpho.d50),
             "d90_m": _col(step.morpho.d90),
         }

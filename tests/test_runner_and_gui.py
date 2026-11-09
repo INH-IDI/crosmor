@@ -43,6 +43,12 @@ def test_simulation_runner_execution():
     assert len(first_step.x) == len(last_step.x)
     assert np.all(np.array(last_step.morpho.z_current) < 5.0)  # Physical bed levels
 
+    # Check volumetric concentration outputs along profile
+    assert len(last_step.transport.c_vol) == len(last_step.x)
+    assert len(last_step.transport.c_mean_vol) == len(last_step.x)
+    assert all(c >= 0.0 for c in last_step.transport.c_vol)
+    assert all(c >= 0.0 for c in last_step.transport.c_mean_vol)
+
 
 def test_gui_offscreen_components():
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -67,5 +73,12 @@ def test_gui_offscreen_components():
         # Collect back config
         cfg = win.collect_config()
         assert cfg.title == "Dgoot1"
+
+        # Check dashboard concentration controls
+        assert win.dashboard.chk_concentration.isChecked()
+        win.dashboard.chk_concentration.setChecked(False)
+        assert not win.dashboard.c_ca.isVisible()
+        win.dashboard.chk_concentration.setChecked(True)
+        assert win.dashboard.c_ca.isVisible()
 
     win.close()

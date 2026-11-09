@@ -61,7 +61,9 @@ class TransportProfileSummary(BaseModel):
     int_sb_long: List[float] = Field(default_factory=list, description="Integrated longshore bedload (kg/s)")
     int_ss_long: List[float] = Field(default_factory=list, description="Integrated longshore suspended (kg/s)")
     int_st_long: List[float] = Field(default_factory=list, description="Integrated longshore total (kg/s)")
-    ca_ref: List[float] = Field(default_factory=list, description="Reference concentration Ca at z=a (kg/m3)")
+    ca_ref: List[float] = Field(default_factory=list, description="Reference concentration Ca at z=a (m3 sed / m3 water)")
+    c_vol: List[float] = Field(default_factory=list, description="Reference volumetric concentration Ca (m3 sed / m3 water)")
+    c_mean_vol: List[float] = Field(default_factory=list, description="Depth-averaged volumetric concentration (m3 sed / m3 water)")
 
 
 class MorphoProfileSummary(BaseModel):

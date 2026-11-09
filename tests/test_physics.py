@@ -125,3 +125,44 @@ def test_bedload_cell():
     assert np.isfinite(sb_c)
     assert np.isfinite(sb_l)
     assert len(sbi) == 1
+
+
+def test_suspended_cell_and_concentration():
+    from crosmor.morphodynamics.suspended import compute_suspended_cell
+
+    dsi = np.array([0.0002])
+    psi = np.array([1.0])
+    wsi = np.array([0.025])
+
+    ssc, ssw, ssasym, dm_s, ca_act, c_mean_act = compute_suspended_cell(
+        vr=0.2,
+        ur=-0.1,
+        hs=1.2,
+        hd=3.0,
+        tp=7.0,
+        ubw=0.8,
+        ubwr=0.8,
+        a_ref=0.01,
+        rc=0.02,
+        rw=0.02,
+        ra=0.05,
+        delm=0.05,
+        ust=0.05,
+        ca_ref=0.005,
+        cai_fractions=np.array([0.005]),
+        wsi=wsi,
+        dsi=dsi,
+        psi=psi,
+        d50=0.0002,
+        rhos=2650.0,
+        rkap=0.4,
+        ateta_rad=0.1,
+        bsly=0.01,
+        tanif=0.6,
+        sef=1.0,
+        faktor=0.0,
+    )
+    assert np.isfinite(ssc)
+    assert np.isfinite(ssw)
+    assert np.isclose(ca_act, 0.005)
+    assert 0.0 <= c_mean_act <= 0.005

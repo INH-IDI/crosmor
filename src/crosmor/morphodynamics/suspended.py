@@ -36,11 +36,11 @@ def compute_suspended_cell(
     rmob: float = 100.0,
     ul_longwave: float = 0.0,
     nn_layers: int = 50,
-) -> Tuple[float, float, float, np.ndarray, float]:
+) -> Tuple[float, float, float, np.ndarray, float, float]:
     """Integrate vertical concentration and velocity profiles matching SUSPEN.F.
 
     Returns:
-        (ssc_longshore, ssw_cross_shore, ss_asym, dm_by_fraction, ca_actual)
+        (ssc_longshore, ssw_cross_shore, ss_asym, dm_by_fraction, ca_actual, c_mean_vol)
     """
     ns = len(dsi)
     pi = math.pi
@@ -64,6 +64,7 @@ def compute_suspended_cell(
     ss_asym_total = 0.0
     dm_frac = np.zeros(ns, dtype=np.float64)
     somdm = 0.0
+    c_int_vol_total = 0.0
 
     # Grid in vertical z from a to hd (logarithmic distribution)
     z_levels = np.zeros(nn_layers, dtype=np.float64)
@@ -152,7 +153,9 @@ def compute_suspended_cell(
         for iz in range(1, nn_layers):
             z = z_levels[iz]
             dz = z_levels[iz] - z_levels[iz - 1]
-            c_mid = 0.5 * (c_prof[iz] + c_prof[iz - 1]) * rhos * psi_val
+            c_vol_mid = 0.5 * (c_prof[iz] + c_prof[iz - 1]) * psi_val
+            c_mid = c_vol_mid * rhos
+            c_int_vol_total += c_vol_mid * dz
 
             # Current velocity uc(z)
             if z < delm:
@@ -192,4 +195,5 @@ def compute_suspended_cell(
         if abs(cos_teta) > 1e-4:
             somdm += dm_val / (fsl3 * cos_teta)
 
-    return ssc_total, somdm, ss_asym_total, dm_frac, ca_ref
+    c_mean_vol = c_int_vol_total / max(0.05, hd)
+    return ssc_total, somdm, ss_asym_total, dm_frac, ca_ref, c_mean_vol

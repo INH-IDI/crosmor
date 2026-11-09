@@ -63,6 +63,11 @@ class MorphoDashboard(QWidget):
         self.chk_transport_components.toggled.connect(self._toggle_curves)
         toolbar.addWidget(self.chk_transport_components)
 
+        self.chk_concentration = QCheckBox("Concentration (m³/m³)")
+        self.chk_concentration.setChecked(True)
+        self.chk_concentration.toggled.connect(self._toggle_curves)
+        toolbar.addWidget(self.chk_concentration)
+
         toolbar.addStretch()
 
         self.btn_autorange = QPushButton("⟲ Auto Range")
@@ -118,10 +123,10 @@ class MorphoDashboard(QWidget):
         self.p2.addItem(zero_line_p2)
 
         # ---------------------------------------------------------------------
-        # Plot 3: Sediment Transport Rates
+        # Plot 3: Sediment Transport Rates & Concentration
         # ---------------------------------------------------------------------
         self.p3 = self.glw.addPlot(row=2, col=0)
-        self.p3.setTitle("<b>Sediment Transport Rates</b>", color="#0f172a", size="11pt")
+        self.p3.setTitle("<b>Sediment Transport Rates & Concentration</b>", color="#0f172a", size="11pt")
         self.p3.setLabel("left", "Transport (kg/(s·m))")
         self.p3.showGrid(x=True, y=True, alpha=0.3)
         self.p3.setXLink(self.p1)
@@ -140,6 +145,26 @@ class MorphoDashboard(QWidget):
         zero_line_p3 = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen(color="#cbd5e1", width=1, style=Qt.PenStyle.DashLine))
         self.p3.addItem(zero_line_p3)
 
+        # Secondary right axis for volumetric sediment concentration (m³ sed / m³ agua)
+        self.vb_conc = pg.ViewBox()
+        self.p3.showAxis("right")
+        self.p3.scene().addItem(self.vb_conc)
+        self.p3.getAxis("right").linkToView(self.vb_conc)
+        self.vb_conc.setXLink(self.p3)
+        self.p3.getAxis("right").setLabel("Concentration (m³ sed / m³ agua)", color="#7c3aed")
+
+        self.p3.vb.sigResized.connect(self._sync_conc_view)
+
+        pen_conc = pg.mkPen(color="#7c3aed", width=2.2)
+        pen_cmean = pg.mkPen(color="#a855f7", width=1.5, style=Qt.PenStyle.DashLine)
+
+        self.c_ca = pg.PlotCurveItem([], [], pen=pen_conc, name="Bed Conc Ca (m³/m³)")
+        self.c_cmean = pg.PlotCurveItem([], [], pen=pen_cmean, name="Mean Conc C_mean (m³/m³)")
+        self.vb_conc.addItem(self.c_ca)
+        self.vb_conc.addItem(self.c_cmean)
+        self.leg3.addItem(self.c_ca, "Bed Conc Ca (m³/m³)")
+        self.leg3.addItem(self.c_cmean, "Mean Conc C_mean (m³/m³)")
+
         # ---------------------------------------------------------------------
         # Plot 4: Cumulative Bed Level Change dz
         # ---------------------------------------------------------------------
@@ -157,6 +182,11 @@ class MorphoDashboard(QWidget):
         zero_line_p4 = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen(color="#cbd5e1", width=1, style=Qt.PenStyle.DashLine))
         self.p4.addItem(zero_line_p4)
 
+    def _sync_conc_view(self) -> None:
+        """Keep right secondary ViewBox perfectly synchronized with Plot 3 geometry."""
+        self.vb_conc.setGeometry(self.p3.vb.sceneBoundingRect())
+        self.vb_conc.linkedViewChanged(self.p3.vb, self.vb_conc.XAxis)
+
     def _toggle_curves(self) -> None:
         """Handle layer visibility toggles."""
         self.c_z_init.setVisible(self.chk_init_bed.isChecked())
@@ -164,6 +194,10 @@ class MorphoDashboard(QWidget):
         show_trans_parts = self.chk_transport_components.isChecked()
         self.c_sb_cross.setVisible(show_trans_parts)
         self.c_ss_cross.setVisible(show_trans_parts)
+        show_conc = self.chk_concentration.isChecked()
+        self.c_ca.setVisible(show_conc)
+        self.c_cmean.setVisible(show_conc)
+        self.p3.showAxis("right", show_conc)
 
     def update_data(self, step_res: TimeStepResult) -> None:
         """Update all 4 panels with data from the given simulation time step."""
@@ -214,6 +248,19 @@ class MorphoDashboard(QWidget):
         if len(st_l) == len(x):
             self.c_st_long.setData(x, st_l)
 
+        # Plot 3 secondary axis: Volumetric concentration (m³ sed / m³ agua)
+        c_ca = np.asarray(step_res.transport.c_vol or step_res.transport.ca_ref, dtype=np.float64)
+        c_mean = np.asarray(step_res.transport.c_mean_vol, dtype=np.float64)
+
+        if len(c_ca) == len(x):
+            self.c_ca.setData(x, c_ca)
+        if len(c_mean) == len(x):
+            self.c_cmean.setData(x, c_mean)
+
+        self._sync_conc_view()
+        if len(c_ca) == len(x) or len(c_mean) == len(x):
+            self.vb_conc.enableAutoRange(axis=pg.ViewBox.YAxis)
+
         # Plot 4: Bed Change
         dz = np.asarray(step_res.morpho.dz_total, dtype=np.float64)
         if len(dz) == len(x):
@@ -224,11 +271,13 @@ class MorphoDashboard(QWidget):
             self._first_render = False
 
     def auto_range(self) -> None:
-        """Autorange all 4 subplots."""
+        """Autorange all subplots and secondary views."""
         self.p1.autoRange()
         self.p2.autoRange()
         self.p3.autoRange()
+        self.vb_conc.autoRange()
         self.p4.autoRange()
+        self._sync_conc_view()
 
     def clear(self) -> None:
         """Clear all curve data."""
@@ -243,5 +292,7 @@ class MorphoDashboard(QWidget):
         self.c_sb_cross.clear()
         self.c_ss_cross.clear()
         self.c_st_long.clear()
+        self.c_ca.clear()
+        self.c_cmean.clear()
         self.c_dz.clear()
         self._first_render = True

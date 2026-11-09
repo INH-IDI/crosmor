@@ -74,6 +74,7 @@ def solve_morphodynamics(
     ssln = np.zeros(nxi, dtype=np.float64)
     stln = np.zeros(nxi, dtype=np.float64)
     capr = np.zeros(nxi, dtype=np.float64)
+    c_mean_prof = np.zeros(nxi, dtype=np.float64)
 
     dmt = np.zeros((nfr, nxi), dtype=np.float64)
 
@@ -205,7 +206,7 @@ def solve_morphodynamics(
 
             # 2. Suspended load
             faktor = config.morpho.facsusw * 0.1 * (((ubwfor**4 - ubwback**4) / (ubwfor**3 + ubwback**3 + 1e-6)) + ub)
-            ssc, ssw, ssasym, dm_s, ca_act = compute_suspended_cell(
+            ssc, ssw, ssasym, dm_s, ca_act, c_mean_act = compute_suspended_cell(
                 vr=vr_val,
                 ur=ur,
                 hs=hs_val,
@@ -253,6 +254,7 @@ def solve_morphodynamics(
             ssln[ix] += p_class * ssx
             stln[ix] += p_class * stx
             capr[ix] += p_class * ca_act
+            c_mean_prof[ix] += p_class * c_mean_act
 
             # Fractions transport
             for j in range(nfr):
@@ -428,6 +430,8 @@ def solve_morphodynamics(
         int_ss_long=[float(x) for x in int_ss_long],
         int_st_long=[float(x) for x in int_st_long],
         ca_ref=[float(x) for x in capr],
+        c_vol=[float(x) for x in capr],
+        c_mean_vol=[float(x) for x in c_mean_prof],
     )
 
     morpho_summary = MorphoProfileSummary(
