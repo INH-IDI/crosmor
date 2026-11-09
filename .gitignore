@@ -31,4 +31,5 @@ ENV/
 # Temporary outputs
 *.xlsx
 *.csv
+.~lock.*#
 !examples/*
