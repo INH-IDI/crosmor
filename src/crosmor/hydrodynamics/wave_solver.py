@@ -503,26 +503,35 @@ def solve_wave_hydrodynamics(
         g=g,
     )
 
-    summary.hrms = [float(x) for x in hrms_arr]
-    summary.trms = [float(x) for x in trms_arr]
-    summary.h13 = [float(x) for x in h13_arr]
-    summary.t13 = [float(x) for x in t13_arr]
-    summary.h110 = [float(x) for x in h110_arr]
-    summary.hmax = [float(x) for x in h110_arr]  # representative
-    summary.s_setup = [float(x) for x in setup_arr]
-    summary.qb_total = [float(x) for x in qb_arr]
-    summary.dbr_total = [float(x) for x in dbr_arr]
-    summary.v_no_mix = [float(x) for x in v_no_mix]
-    summary.v_mix = [float(x) for x in v_mix]
-    summary.c1_chezy = [float(x) for x in c1_chezy]
-    summary.c2_chezy = [float(x) for x in c2_chezy]
-    summary.ubwf_rms = [float(x) for x in uwf_rms_arr]
-    summary.ubwb_rms = [float(x) for x in uwb_rms_arr]
-    summary.ucr_mean = [float(x) for x in ucr_mean_arr]
-    summary.ub_mean = [float(x) for x in ub_mean_arr]
-    summary.ucr_rms = [float(x) for x in ucr_rms_arr]
-    summary.ub_rms = [float(x) for x in ub_rms_arr]
+    nx = len(x_grid)
 
-    water_depth = hd_base[:nxi] + setup_arr
+    def _pad_nx(arr, fill: float = 0.0) -> List[float]:
+        res = [float(x) for x in arr]
+        if len(res) < nx:
+            res.extend([fill] * (nx - len(res)))
+        return res
+
+    summary.hrms = _pad_nx(hrms_arr)
+    summary.trms = _pad_nx(trms_arr)
+    summary.h13 = _pad_nx(h13_arr)
+    summary.t13 = _pad_nx(t13_arr)
+    summary.h110 = _pad_nx(h110_arr)
+    summary.hmax = _pad_nx(h110_arr)  # representative
+    summary.s_setup = _pad_nx(setup_arr)
+    summary.qb_total = _pad_nx(qb_arr)
+    summary.dbr_total = _pad_nx(dbr_arr)
+    summary.v_no_mix = _pad_nx(v_no_mix)
+    summary.v_mix = _pad_nx(v_mix)
+    summary.c1_chezy = _pad_nx(c1_chezy)
+    summary.c2_chezy = _pad_nx(c2_chezy)
+    summary.ubwf_rms = _pad_nx(uwf_rms_arr)
+    summary.ubwb_rms = _pad_nx(uwb_rms_arr)
+    summary.ucr_mean = _pad_nx(ucr_mean_arr)
+    summary.ub_mean = _pad_nx(ub_mean_arr)
+    summary.ucr_rms = _pad_nx(ucr_rms_arr)
+    summary.ub_rms = _pad_nx(ub_rms_arr)
+
+    water_depth = np.zeros(nx, dtype=np.float64)
+    water_depth[:nxi] = hd_base[:nxi] + setup_arr
 
     return wave_profiles, summary, water_depth, arksc_out, rksw_grid

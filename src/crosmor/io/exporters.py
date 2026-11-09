@@ -45,8 +45,11 @@ def export_results_to_excel(results: SimulationResults, file_path: Union[str, Pa
         pd.DataFrame(ts_rows).to_excel(writer, sheet_name="Timeline", index=False)
 
         def _safe_col(arr, nx):
-            if arr is not None and len(arr) == nx:
-                return arr
+            if arr is not None:
+                if len(arr) == nx:
+                    return arr
+                elif len(arr) < nx:
+                    return list(arr) + [0.0] * (nx - len(arr))
             return [0.0] * nx
 
         # 2. Latest profile state
@@ -94,8 +97,11 @@ def export_profile_to_csv(step: TimeStepResult, file_path: Union[str, Path]) -> 
     nx = len(step.x)
 
     def _col(arr):
-        if arr is not None and len(arr) == nx:
-            return arr
+        if arr is not None:
+            if len(arr) == nx:
+                return arr
+            elif len(arr) < nx:
+                return list(arr) + [0.0] * (nx - len(arr))
         return [0.0] * nx
 
     df = pd.DataFrame(

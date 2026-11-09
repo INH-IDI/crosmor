@@ -218,20 +218,21 @@ class MorphoDashboard(QWidget):
         if len(eta) == len(x):
             self.c_water.setData(x, eta)
 
+        def _safe_set(curve, arr):
+            if arr is not None and len(arr) > 0:
+                n = min(len(x), len(arr))
+                curve.setData(x[:n], arr[:n])
+
         # Plot 2: Hydrodynamics
         hrms = np.asarray(step_res.hydro.hrms, dtype=np.float64)
         h13 = np.asarray(step_res.hydro.h13, dtype=np.float64)
         vmix = np.asarray(step_res.hydro.v_mix, dtype=np.float64)
         ucr = np.asarray(step_res.hydro.ucr_mean, dtype=np.float64)
 
-        if len(hrms) == len(x):
-            self.c_hrms.setData(x, hrms)
-        if len(h13) == len(x):
-            self.c_h13.setData(x, h13)
-        if len(vmix) == len(x):
-            self.c_vmix.setData(x, vmix)
-        if len(ucr) == len(x):
-            self.c_ucr.setData(x, ucr)
+        _safe_set(self.c_hrms, hrms)
+        _safe_set(self.c_h13, h13)
+        _safe_set(self.c_vmix, vmix)
+        _safe_set(self.c_ucr, ucr)
 
         # Plot 3: Transport
         st_c = np.asarray(step_res.transport.st_cross, dtype=np.float64)
@@ -239,32 +240,25 @@ class MorphoDashboard(QWidget):
         ss_c = np.asarray(step_res.transport.ss_cross, dtype=np.float64)
         st_l = np.asarray(step_res.transport.st_long, dtype=np.float64)
 
-        if len(st_c) == len(x):
-            self.c_st_cross.setData(x, st_c)
-        if len(sb_c) == len(x):
-            self.c_sb_cross.setData(x, sb_c)
-        if len(ss_c) == len(x):
-            self.c_ss_cross.setData(x, ss_c)
-        if len(st_l) == len(x):
-            self.c_st_long.setData(x, st_l)
+        _safe_set(self.c_st_cross, st_c)
+        _safe_set(self.c_sb_cross, sb_c)
+        _safe_set(self.c_ss_cross, ss_c)
+        _safe_set(self.c_st_long, st_l)
 
         # Plot 3 secondary axis: Volumetric concentration (m³ sed / m³ agua)
         c_ca = np.asarray(step_res.transport.c_vol or step_res.transport.ca_ref, dtype=np.float64)
         c_mean = np.asarray(step_res.transport.c_mean_vol, dtype=np.float64)
 
-        if len(c_ca) == len(x):
-            self.c_ca.setData(x, c_ca)
-        if len(c_mean) == len(x):
-            self.c_cmean.setData(x, c_mean)
+        _safe_set(self.c_ca, c_ca)
+        _safe_set(self.c_cmean, c_mean)
 
         self._sync_conc_view()
-        if len(c_ca) == len(x) or len(c_mean) == len(x):
+        if (len(c_ca) > 0 and len(c_ca) <= len(x)) or (len(c_mean) > 0 and len(c_mean) <= len(x)):
             self.vb_conc.enableAutoRange(axis=pg.ViewBox.YAxis)
 
         # Plot 4: Bed Change
         dz = np.asarray(step_res.morpho.dz_total, dtype=np.float64)
-        if len(dz) == len(x):
-            self.c_dz.setData(x, dz)
+        _safe_set(self.c_dz, dz)
 
         if self._first_render:
             self.auto_range()

@@ -91,6 +91,7 @@ class TimeStepResult(BaseModel):
     time: float = Field(..., description="Simulation time (s)")
     dt: float = Field(..., description="Time step duration (s)")
     step_number: int = Field(0, description="Step counter index")
+    nxi: int = Field(0, description="Active wet cutoff index (water depth >= hgrens)")
     x: List[float] = Field(default_factory=list, description="Cross-shore coordinates (m)")
     water_depth: List[float] = Field(default_factory=list, description="Total water depth HD (m)")
     water_level_eta: List[float] = Field(default_factory=list, description="Surface water level (m)")

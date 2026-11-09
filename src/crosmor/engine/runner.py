@@ -259,15 +259,18 @@ class SimulationRunner:
                 d90_grid[i] = d90_val
 
             # Water surface elevation eta(x)
-            eta = [float(zbn[i] + water_depth[i]) if i < nxi else float(zbn[i]) for i in range(nx)]
+            # In water (i < nxi): eta = zbn + water_depth
+            # On dry beach (i >= nxi): float('nan') so water line stops cleanly at shoreline
+            eta = [float(zbn[i] + water_depth[i]) if i < nxi else float("nan") for i in range(nx)]
 
             step_res = TimeStepResult(
                 time=time + dt,
                 dt=dt,
                 step_number=step_idx,
-                x=[float(x) for x in x_grid[:nxi]],
+                nxi=nxi,
+                x=[float(x) for x in x_grid],
                 water_depth=[float(d) for d in water_depth],
-                water_level_eta=eta[:nxi],
+                water_level_eta=eta,
                 hydro=hydro_summary,
                 transport=transport_summary,
                 morpho=morpho_summary,

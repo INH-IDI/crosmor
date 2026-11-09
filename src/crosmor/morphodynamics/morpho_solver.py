@@ -67,14 +67,14 @@ def solve_morphodynamics(
     rhow, rnu, del_density = compute_fluid_properties(config.morpho.water_temp, config.morpho.salinity)
 
     # Initialize transport accumulation
-    sbcr = np.zeros(nxi, dtype=np.float64)
-    sscr = np.zeros(nxi, dtype=np.float64)
-    stcr = np.zeros(nxi, dtype=np.float64)
-    sbln = np.zeros(nxi, dtype=np.float64)
-    ssln = np.zeros(nxi, dtype=np.float64)
-    stln = np.zeros(nxi, dtype=np.float64)
-    capr = np.zeros(nxi, dtype=np.float64)
-    c_mean_prof = np.zeros(nxi, dtype=np.float64)
+    sbcr = np.zeros(nx, dtype=np.float64)
+    sscr = np.zeros(nx, dtype=np.float64)
+    stcr = np.zeros(nx, dtype=np.float64)
+    sbln = np.zeros(nx, dtype=np.float64)
+    ssln = np.zeros(nx, dtype=np.float64)
+    stln = np.zeros(nx, dtype=np.float64)
+    capr = np.zeros(nx, dtype=np.float64)
+    c_mean_prof = np.zeros(nx, dtype=np.float64)
 
     dmt = np.zeros((nfr, nxi), dtype=np.float64)
 
@@ -407,10 +407,10 @@ def solve_morphodynamics(
             break
 
     # Integrated longshore transport
-    int_sb_long = np.zeros(nxi, dtype=np.float64)
-    int_ss_long = np.zeros(nxi, dtype=np.float64)
-    int_st_long = np.zeros(nxi, dtype=np.float64)
-    for i in range(nxi):
+    int_sb_long = np.zeros(nx, dtype=np.float64)
+    int_ss_long = np.zeros(nx, dtype=np.float64)
+    int_st_long = np.zeros(nx, dtype=np.float64)
+    for i in range(nx):
         dx_val = x_grid[i] - (x_grid[i - 1] if i > 0 else x_grid[0])
         int_sb_long[i] = (int_sb_long[i - 1] if i > 0 else 0.0) + sbln[i] * dx_val
         int_ss_long[i] = (int_ss_long[i - 1] if i > 0 else 0.0) + ssln[i] * dx_val
@@ -434,14 +434,18 @@ def solve_morphodynamics(
         c_mean_vol=[float(x) for x in c_mean_prof],
     )
 
+    # Full grid psi update
+    psi_full = np.copy(psi_grid)
+    psi_full[:, :nxi] = psi_smoothed
+
     morpho_summary = MorphoProfileSummary(
-        dz_step=[float(x) for x in (zbn_new[:nxi] - zbn[:nxi])],
-        dz_total=[float(x) for x in (zbn_new[:nxi] - zbo[:nxi])],
-        z_initial=[float(x) for x in zbo[:nxi]],
-        z_current=[float(x) for x in zbn_new[:nxi]],
-        d50=[float(x) for x in d50_grid[:nxi]],
-        d90=[float(x) for x in d90_grid[:nxi]],
-        fractions=[[float(psi_smoothed[j, i]) for j in range(nfr)] for i in range(nxi)],
+        dz_step=[float(x) for x in (zbn_new - zbn)],
+        dz_total=[float(x) for x in (zbn_new - zbo)],
+        z_initial=[float(x) for x in zbo],
+        z_current=[float(x) for x in zbn_new],
+        d50=[float(x) for x in d50_grid],
+        d90=[float(x) for x in d90_grid],
+        fractions=[[float(psi_full[j, i]) for j in range(nfr)] for i in range(nx)],
     )
 
     volume_summary = VolumeBalanceSummary(
@@ -449,10 +453,6 @@ def solve_morphodynamics(
         scross_x0_m2=float(qcr0_new / ((1.0 - por) * rhos)),
         scross_xr_m2=float(qcrxr_new / ((1.0 - por) * rhos)),
     )
-
-    # Full grid psi update
-    psi_full = np.copy(psi_grid)
-    psi_full[:, :nxi] = psi_smoothed
 
     return (
         transport_summary,

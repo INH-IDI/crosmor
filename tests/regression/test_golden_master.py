@@ -45,18 +45,26 @@ def test_dgoot1_hydrodynamics_golden_master():
     python_hrms = np.asarray(step0.hydro.hrms)
     python_h13 = np.asarray(step0.hydro.h13)
 
-    # 1. Verify grid alignment (within 0.01m to account for Fortran F9.2 print truncation)
-    assert len(python_x) == len(fortran_x)
-    assert np.allclose(python_x, fortran_x, atol=0.01)
+    n_wet = len(fortran_x)
+    # 1. Verify grid alignment in wet zone with hydro block B001
+    assert np.allclose(python_x[:n_wet], fortran_x, atol=0.01)
 
     # 2. Verify water depth profile
-    assert np.allclose(python_hd, fortran_hd, atol=0.05)
+    assert np.allclose(python_hd[:n_wet], fortran_hd, atol=0.05)
 
-    # 3. Verify wave height (HRMS) matching Fortran 77 within 0.05 m across entire profile
-    assert np.allclose(python_hrms, fortran_hrms, atol=0.05)
+    # 3. Verify wave height (HRMS) matching Fortran 77 within 0.05 m across wet profile
+    assert np.allclose(python_hrms[:n_wet], fortran_hrms, atol=0.05)
 
     # 4. Verify significant wave height (H1/3) within 0.05 m
-    assert np.allclose(python_h13, fortran_h13, atol=0.05)
+    assert np.allclose(python_h13[:n_wet], fortran_h13, atol=0.05)
+
+    # 5. Verify full profile grid including dry beach matches Fortran block B011 (651 points)
+    b011 = [b for b in out_data.blocks if b.block_id == "B011"][0]
+    fortran_x_full = b011.data[:, 0]
+    fortran_z_init = b011.data[:, 3]
+    assert len(python_x) == len(fortran_x_full)
+    assert np.allclose(python_x, fortran_x_full, atol=0.06)
+    assert np.allclose(step0.morpho.z_initial, fortran_z_init, atol=0.05)
 
 
 def test_atest1_wave_height_golden_master():
